@@ -1,20 +1,26 @@
 import os
 import glob
+import requests
 import chromadb
-from fastembed import TextEmbedding
 
 CHROMA_PATH = "data/chroma_db"
 COLLECTION_NAME = "runbooks_collection"
 DOCS_DIR = "data/docs"
+OLLAMA_URL = "http://localhost:11434/api/embed"
+EMBED_MODEL = "nomic-embed-text"
+
+def get_ollama_embeddings(texts: list[str]) -> list[list[float]]:
+    response = requests.post(
+        OLLAMA_URL,
+        json={"model": EMBED_MODEL, "input": texts}
+    )
+    response.raise_for_status()
+    return response.json()["embeddings"]
 
 def build_vector_index():
-    print("Инициализация модели эмбеддингов...")
-    embed_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-
     print(f"Подключение к ChromaDB ({CHROMA_PATH})...")
     client = chromadb.PersistentClient(path=CHROMA_PATH)
 
-    # Пересоздаём коллекцию при запуске prepare_data.py, чтобы не плодить дубликаты
     try:
         client.delete_collection(name=COLLECTION_NAME)
     except Exception:
@@ -40,7 +46,6 @@ def build_vector_index():
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        # Разбиваем документ на абзацы/секции (простой чанкинг)
         chunks = [chunk.strip() for chunk in content.split("\n\n") if len(chunk.strip()) > 30]
 
         for idx, chunk in enumerate(chunks):
@@ -49,8 +54,8 @@ def build_vector_index():
             ids.append(f"{filename}_{idx}_{doc_counter}")
             doc_counter += 1
 
-    print(f"Генерация векторов для {len(documents)} фрагментов текста...")
-    embeddings = [vec.tolist() for vec in embed_model.embed(documents)]
+    print(f"Генерация векторов через Ollama ({EMBED_MODEL}) для {len(documents)} фрагментов...")
+    embeddings = get_ollama_embeddings(documents)
 
     collection.add(
         documents=documents,
@@ -61,5 +66,4 @@ def build_vector_index():
     print(f"Готово! В векторную базу сохранено {len(documents)} записей.")
 
 if __name__ == "__main__":
-    # Здесь же может вызываться твоя функция создания SQLite БД, если она есть в этом файле
     build_vector_index()
