@@ -21,3 +21,8 @@
 - **Structured Data:** SQLite database populated with security audit logs (`timestamp`, `system_name`, `component`, `log_level`, `corr_id`, `user_id`, `message`).
 - **Unstructured Data:** Markdown documents containing remediation runbooks and incident post-mortems (`casb_runbook.md`, `pam_vault_policy.md`, `postmortem_2025_05.md`).
 - **Tech Stack:** Python 3.14, Groq SDK, SQLite3, FastEmbed, NumPy.
+## 5. Architecture Evolution
+During the development of this PoC, the RAG retrieval layer went through three deliberate iterations:
+1. **In-Memory Prototype:** Initial retrieval computed embeddings at runtime in memory using `numpy`. While fast to prototype, it did not scale and re-indexed documents on every startup.
+2. **Embedded Vector Store (`ChromaDB` + `fastembed`):** Decoupled offline ingestion (`prepare_data.py`) from runtime search using persistent local storage.
+3. **Service-Oriented Embeddings (`ChromaDB` + `Ollama`):** Extracted embedding generation into a standalone local `Ollama` service (`nomic-embed-text`), eliminating heavy ML runtime dependencies from the main Python application and isolating model inference.
